@@ -1,0 +1,8 @@
+name        = "Entity Update"
+source_dir  = "source"
+output_dir  = "output"
+description = [=[you probably don't want this]=]
+image       = "preview.jpg"
+tag_modtype = ""
+tag_support = ""
+publish_id = "54cfb955"
