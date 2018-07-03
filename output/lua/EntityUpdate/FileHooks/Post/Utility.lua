@@ -1,0 +1,1 @@
+DebugPrint = function(...) end

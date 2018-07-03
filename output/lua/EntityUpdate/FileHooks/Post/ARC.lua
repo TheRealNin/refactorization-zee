@@ -1,7 +1,5 @@
-if Server then
-    local oldOnCreate = ARC.OnCreate
-    function ARC:OnCreate()
-        oldOnCreate(self)
-        self:SetFastUpdates(true)
+if kUseFixedUpdates then
+    function ARC:GetTickTime()
+        return 0 -- realtime
     end
 end

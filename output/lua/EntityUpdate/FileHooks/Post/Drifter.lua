@@ -1,7 +1,5 @@
-if Server then
-    local oldOnCreate = Drifter.OnCreate
-    function Drifter:OnCreate()
-        oldOnCreate(self)
-        self:SetFastUpdates(true)
+if kUseFixedUpdates then
+    function Drifter:GetTickTime()
+        return 0 -- realtime
     end
 end

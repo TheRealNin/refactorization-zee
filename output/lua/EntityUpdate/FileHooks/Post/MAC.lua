@@ -1,7 +1,5 @@
-if Server then
-    local oldOnCreate = MAC.OnCreate
-    function MAC:OnCreate()
-        oldOnCreate(self)
-        self:SetFastUpdates(true)
+if kUseFixedUpdates then
+    function MAC:GetTickTime()
+        return 0 -- realtime
     end
 end

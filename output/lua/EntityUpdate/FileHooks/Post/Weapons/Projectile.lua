@@ -1,7 +1,5 @@
-if Server then
-    local oldOnCreate = Projectile.OnCreate
-    function Projectile:OnCreate()
-        oldOnCreate(self)
-        self:SetFastUpdates(true)
+if kUseFixedUpdates then
+    function Projectile:GetTickTime()
+        return 0 -- realtime
     end
 end

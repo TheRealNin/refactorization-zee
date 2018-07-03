@@ -1,13 +1,10 @@
-
---[[
-local oldOnUpdate = RepositioningMixin.OnUpdate
-function RepositioningMixin:OnUpdate(deltaTime)
-    oldOnUpdate(self, deltaTime)
-    if self:GetIsRepositioning() then
-        self:SetFastUpdates(true)
-    else
-        self:SetFastUpdates(false)
+if kUseFixedUpdates then
+    local old__initmixin = RepositioningMixin.__initmixin
+    function RepositioningMixin:__initmixin()
+        old__initmixin(self)
+        
+        -- TODO: Fix this hack
+        self.GetTickTime = function() return 0 end
         self:SetUpdates(true)
     end
 end
-]]--

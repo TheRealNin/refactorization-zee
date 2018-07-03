@@ -1,8 +1,6 @@
-if Server then 
+if kUseFixedUpdates then 
     -- this is just to be safe
-    local oldOnCreate = NS2Gamerules.OnCreate
-    function NS2Gamerules:OnCreate()
-        oldOnCreate(self)
-        self:SetFastUpdates(true)
+    function NS2Gamerules:GetTickTime()
+        return 0 -- realtime
     end
 end

@@ -1,5 +1,5 @@
 if kUseFixedUpdates then
-    function PredictedProjectile:GetTickTime()
+    function ClipWeapon:GetTickTime()
         return 0 -- realtime
     end
 end

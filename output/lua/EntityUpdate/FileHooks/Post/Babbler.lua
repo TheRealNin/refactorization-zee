@@ -1,7 +1,5 @@
-if Server then
-    local oldOnCreate = Babbler.OnCreate
-    function Babbler:OnCreate()
-        oldOnCreate(self)
-        self:SetFastUpdates(true)
+if kUseFixedUpdates then
+    function Babbler:GetTickTime()
+        return 0 -- realtime
     end
 end
