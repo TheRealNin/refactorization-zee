@@ -1,2 +1,4 @@
-PROFILE = function(...) end
-Shared.GetDevMode = function(...) end
+--function PROFILE() end
+function Shared.GetDevMode () 
+    return false
+end
