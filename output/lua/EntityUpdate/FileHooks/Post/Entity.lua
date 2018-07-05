@@ -62,6 +62,19 @@ function Entity:GetTickTime()
     return kTickTime
 end
     
+local oldOnInitialized = Entity.OnInitialized
+function Entity:OnInitialized()
+    oldOnInitialized(self)
+    
+    -- these are needed by animations and stuff, so don't disable them if we actually need them! 
+    -- (no API to re-enable physics callbacks...)
+    if HasMixin(self, "BaseModel") or HasMixin(self, "Controller") or HasMixin(self, "Live") then
+    
+    else
+        self:DisableOnUpdatePhysics()
+        self:DisableOnFinishPhysics()
+    end
+end
 local oldOnDestroy = Entity.OnDestroy
 function Entity:OnDestroy()
     
@@ -76,10 +89,9 @@ end
 
 function Entity:SetUpdates(updates, interval)
     --self:SetUpdatesActual(false)
-    --self:DisableOnPreUpdate()
-    -- these are needed by predict :O
-    --self:DisableOnUpdatePhysics()
-    --self:DisableOnFinishPhysics()
+    
+    -- literally nothing uses OnPreUpdate so it's safe to disable it
+    self:DisableOnPreUpdate()
     if updates then
         if not interval then
             interval = self:GetTickTime() or kTickTime
