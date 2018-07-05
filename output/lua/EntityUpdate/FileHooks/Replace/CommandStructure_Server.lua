@@ -9,6 +9,10 @@
 
 local kCheckForLoginTimer = 3.00
 
+function CommandStructure:GetTickTime()
+    return 0 -- realtime
+end
+
 function CommandStructure:SetCustomPhysicsGroup()
     self:SetPhysicsGroup(PhysicsGroup.BigStructuresGroup)
 end
