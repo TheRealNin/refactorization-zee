@@ -3,10 +3,12 @@ kUseFixedUpdates = true
 
 -- {id, interval, last_update}
 local updaters = {}
+local updaters_to_add = {}
 local delete_updaters = {}
 
 -- {id, callback, interval, early, last_update}
 local callbacks = {}
+local callbacks_to_add = {}
 local delete_callbacks = {}
 
 local kTickTime = 1.00
@@ -40,15 +42,14 @@ end
 
 local function AddUpdater(id, interval)
     DeleteUpdater(id) -- there can be only one
-    table.insert(updaters, {id=id, interval=interval, last_update=nil})
+    table.insert(updaters_to_add, {id=id, interval=interval, last_update=nil})
 end
 
 function Entity:AddTimedCallbackActual(callback, interval, early)
-    --self._added_callback = true
-    table.insert(callbacks, {id=self:GetId(), callback=callback, interval=interval, early=early, last_update=Shared.GetTime()})
+    table.insert(callbacks_to_add, {id=self:GetId(), callback=callback, interval=interval, early=early, last_update=Shared.GetTime()})
 end
 
-local function DeleteCallbacker(id)
+local function DeleteCallbacks(id)
     for index, callback in ipairs(callbacks) do
         if callback.id == id and not callback.deleted then
             callback.deleted = true
@@ -63,9 +64,9 @@ end
     
 local oldOnDestroy = Entity.OnDestroy
 function Entity:OnDestroy()
-    DeleteUpdater(self:GetId())
-    DeleteCallbacker(self:GetId())
     
+    DeleteUpdater(self:GetId())
+    DeleteCallbacks(self:GetId())
     oldOnDestroy(self)
 end
 
@@ -75,7 +76,7 @@ end
 
 function Entity:SetUpdates(updates, interval)
     --self:SetUpdatesActual(false)
-    self:DisableOnPreUpdate()
+    --self:DisableOnPreUpdate()
     -- these are needed by predict :O
     --self:DisableOnUpdatePhysics()
     --self:DisableOnFinishPhysics()
@@ -114,15 +115,49 @@ local function UpdateCallback(callback, time)
     return false
 end
 
+local function CleanupAll()
+    -- cleanup all callbacks and updates
+    for i=#delete_updaters,1,-1 do
+        DeleteUpdater(delete_updaters[i])
+    end
+    delete_updaters = {}
+    
+    table.sort(delete_callbacks)
+    for i=#delete_callbacks,1,-1 do
+        table.remove(callbacks, delete_callbacks[i])
+    end
+    delete_callbacks ={}
+end
+
+ -- add all callbacks and updaters waiting
+local function AddWaiting()
+    
+    for i=#updaters_to_add,1,-1 do
+        table.insert(updaters, updaters_to_add[i])
+    end
+    updaters_to_add = {}
+    
+    for i=#callbacks_to_add,1,-1 do
+        table.insert(callbacks, callbacks_to_add[i])
+    end
+    callbacks_to_add = {}
+    
+end
+
 local function EntityOnUpdate(deltaTime)
+
     local time = Shared.GetTime()
+    
+    CleanupAll()
+    
+    AddWaiting()
     
     
     -- early callbacks
     for index, callback in ipairs(callbacks) do
         if not callback.deleted and callback.early and callback.last_update + callback.interval <= time then
             if not UpdateCallback(callback, time) then
-                table.insert(delete_callbacks, index)
+                table.insertunique(delete_callbacks, index)
             end
         end
     end
@@ -131,8 +166,8 @@ local function EntityOnUpdate(deltaTime)
     for index, updater in ipairs(updaters) do
         if not updater.deleted and (not updater.last_update or updater.last_update + updater.interval <= time) then
             if not UpdateUpdater(updater, time) then
-                --Log("Deleting an updater in the *weirdest* spot")
-                table.insert(delete_updaters, index)
+                --Log("We can only reach here if an entity no longer exists...")
+                table.insertunique(delete_updaters, updater.id)
             end
         end
     end
@@ -142,24 +177,10 @@ local function EntityOnUpdate(deltaTime)
     for index, callback in ipairs(callbacks) do
         if not callback.deleted and not callback.early and callback.last_update + callback.interval <= time then
             if not UpdateCallback(callback, time) then
-                table.insert(delete_callbacks, index)
+                table.insertunique(delete_callbacks, index)
             end
         end
     end
-    
-    
-    table.sort(delete_updaters)
-    for i=#delete_updaters,1,-1 do
-        table.remove(updaters, delete_updaters[i])
-    end
-    delete_updaters = {}
-    
-    -- cleanup all callbacks
-    table.sort(delete_callbacks)
-    for i=#delete_callbacks,1,-1 do
-        table.remove(callbacks, delete_callbacks[i])
-    end
-    delete_callbacks ={}
     
 end
 
