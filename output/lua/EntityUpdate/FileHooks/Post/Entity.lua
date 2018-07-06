@@ -18,24 +18,31 @@ if Client then
     kTickTime = 1/5.0
 end
 
+function Entity:GetTickTime()
+    return kTickTime
+end
+    
+
 Entity.SetUpdatesActual = Entity.SetUpdates
 Entity.AddTimedCallbackActualActual = Entity.AddTimedCallbackActual
 
 
-local function GetUpdater(id)
-    for index, updater in ipairs(updaters) do
-        if updater.id == id then
-            return updater
-        end
-    end
-    return nil
-end
 
+-- actually only marks it to be deleted on the next sweep
 local function DeleteUpdater(id)
     for index, updater in ipairs(updaters) do
         if updater.id == id and not updater.deleted then
             updater.deleted = true
             table.insertunique(delete_updaters, index)
+        end
+    end
+end
+
+local function DeleteCallbacks(id)
+    for index, callback in ipairs(callbacks) do
+        if callback.id == id and not callback.deleted then
+            callback.deleted = true
+            table.insertunique(delete_callbacks, index)
         end
     end
 end
@@ -49,19 +56,6 @@ function Entity:AddTimedCallbackActual(callback, interval, early)
     table.insert(callbacks_to_add, {id=self:GetId(), callback=callback, interval=interval, early=early, last_update=Shared.GetTime()})
 end
 
-local function DeleteCallbacks(id)
-    for index, callback in ipairs(callbacks) do
-        if callback.id == id and not callback.deleted then
-            callback.deleted = true
-            table.insertunique(delete_callbacks, index)
-        end
-    end
-end
-
-function Entity:GetTickTime()
-    return kTickTime
-end
-    
 local oldOnInitialized = Entity.OnInitialized
 function Entity:OnInitialized()
     oldOnInitialized(self)
@@ -162,9 +156,9 @@ local function EntityOnUpdate(deltaTime)
     local time = Shared.GetTime()
     
     CleanupAll()
-    
     AddWaiting()
     
+    --Log("Updaters: %s, callbacks: %s", #updaters, #callbacks)
     
     -- early callbacks
     for index, callback in ipairs(callbacks) do
@@ -181,7 +175,7 @@ local function EntityOnUpdate(deltaTime)
         if not updater.deleted and (not updater.last_update or updater.last_update + updater.interval <= time) then
             if not UpdateUpdater(updater, time) then
                 updater.deleted = true
-                table.insertunique(delete_updaters, updater.id)
+                table.insertunique(delete_updaters, index)
             end
         end
     end
