@@ -129,8 +129,9 @@ end
 
 local function CleanupAll()
     -- cleanup all callbacks and updates
+    table.sort(delete_updaters)
     for i=#delete_updaters,1,-1 do
-        DeleteUpdater(delete_updaters[i])
+        table.remove(updaters, delete_updaters[i])
     end
     delete_updaters = {}
     
@@ -144,13 +145,13 @@ end
  -- add all callbacks and updaters waiting
 local function AddWaiting()
     
-    for i=#updaters_to_add,1,-1 do
-        table.insert(updaters, updaters_to_add[i])
+    for i, new_updater in ipairs(updaters_to_add) do
+        table.insert(updaters, new_updater)
     end
     updaters_to_add = {}
     
-    for i=#callbacks_to_add,1,-1 do
-        table.insert(callbacks, callbacks_to_add[i])
+    for i, new_callback in ipairs(callbacks_to_add) do
+        table.insert(callbacks, new_callback)
     end
     callbacks_to_add = {}
     
@@ -169,6 +170,7 @@ local function EntityOnUpdate(deltaTime)
     for index, callback in ipairs(callbacks) do
         if not callback.deleted and callback.early and callback.last_update + callback.interval <= time then
             if not UpdateCallback(callback, time) then
+                callback.deleted = true
                 table.insertunique(delete_callbacks, index)
             end
         end
@@ -178,7 +180,7 @@ local function EntityOnUpdate(deltaTime)
     for index, updater in ipairs(updaters) do
         if not updater.deleted and (not updater.last_update or updater.last_update + updater.interval <= time) then
             if not UpdateUpdater(updater, time) then
-                --Log("We can only reach here if an entity no longer exists...")
+                updater.deleted = true
                 table.insertunique(delete_updaters, updater.id)
             end
         end
@@ -189,6 +191,7 @@ local function EntityOnUpdate(deltaTime)
     for index, callback in ipairs(callbacks) do
         if not callback.deleted and not callback.early and callback.last_update + callback.interval <= time then
             if not UpdateCallback(callback, time) then
+                callback.deleted = true
                 table.insertunique(delete_callbacks, index)
             end
         end
