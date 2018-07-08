@@ -4,22 +4,22 @@
 -- use like kUseFixedUpdates=Server to only enable on the server
 kUseFixedUpdates = true
 
+Log("Refactorization Zee loaded. Be prepared for a bumpy ride.")
 
 -- {id, interval, last_update}
 local updaters = {}
 local updaters_to_add = {}
-local delete_updaters = {}
 
 -- {id, callback, interval, early, last_update}
 local callbacks = {}
+local callbacks_early = {}
 local callbacks_to_add = {}
-local delete_callbacks = {}
 
-local kTickTime = 1.00/10
+local kTickTime = 1/5.0
 
 -- this is to make the game feel "smooth" on the client. Could be increased a little.
 if Client then
-    kTickTime = 1/5.0
+    kTickTime = 1/15.0
 end
 
 function Entity:GetTickTime()
@@ -35,7 +35,22 @@ end
 Entity.SetUpdatesActual = Entity.SetUpdates
 Entity.AddTimedCallbackActualActual = Entity.AddTimedCallbackActual
 
+-- This function returns nil if the entry is planning to add or delete
+local function GetUpdater(id)
 
+    for index, updater in ipairs(updaters_to_add) do
+        if updater.id == id then
+            return nil
+        end
+    end
+    
+    for index, updater in ipairs(updaters) do
+        if updater.id == id and not updater.deleted then
+            return updater
+        end
+    end
+    return nil
+end
 
 -- actually only marks it to be deleted on the next sweep
 local function DeleteUpdater(id)
@@ -43,7 +58,6 @@ local function DeleteUpdater(id)
     for index, updater in ipairs(updaters) do
         if updater.id == id and not updater.deleted then
             updater.deleted = true
-            table.insertunique(delete_updaters, index)
         end
     end
     
@@ -59,9 +73,14 @@ local function DeleteCallbacks(id)
     for index, callback in ipairs(callbacks) do
         if callback.id == id and not callback.deleted then
             callback.deleted = true
-            table.insertunique(delete_callbacks, index)
         end
     end
+    for index, callback in ipairs(callbacks_early) do
+        if callback.id == id and not callback.deleted then
+            callback.deleted = true
+        end
+    end
+    
     
     for i=#callbacks_to_add,1,-1 do
         if callbacks_to_add[i].id == id then
@@ -71,8 +90,13 @@ local function DeleteCallbacks(id)
 end
 
 local function AddUpdater(id, interval)
-    DeleteUpdater(id)
-    table.insert(updaters_to_add, {id=id, interval=interval, last_update=nil})
+    local existing = GetUpdater(id)
+    if existing then
+        existing.interval = interval
+    else
+        DeleteUpdater(id)
+        table.insert(updaters_to_add, {id=id, interval=interval, last_update=nil})
+    end
 end
 
 function Entity:AddTimedCallbackActual(callback, interval, early)
@@ -154,17 +178,24 @@ end
 
 -- cleanup all callbacks and updates
 local function CleanupAll()
-    table.sort(delete_updaters)
-    for i=#delete_updaters,1,-1 do
-        table.remove(updaters, delete_updaters[i])
+
+    for i=#updaters,1,-1 do
+        if updaters[i].deleted then
+            table.remove(updaters, i)
+        end
     end
-    delete_updaters = {}
     
-    table.sort(delete_callbacks)
-    for i=#delete_callbacks,1,-1 do
-        table.remove(callbacks, delete_callbacks[i])
+    for i=#callbacks,1,-1 do
+        if callbacks[i].deleted then
+            table.remove(callbacks, i)
+        end
     end
-    delete_callbacks ={}
+    
+    for i=#callbacks_early,1,-1 do
+        if callbacks_early[i].deleted then
+            table.remove(callbacks_early, i)
+        end
+    end
     
 end
 
@@ -177,7 +208,11 @@ local function AddWaiting()
     updaters_to_add = {}
     
     for i, new_callback in ipairs(callbacks_to_add) do
-        table.insert(callbacks, new_callback)
+        if new_callback.early then
+            table.insert(callbacks_early, new_callback)
+        else
+            table.insert(callbacks, new_callback)
+        end
     end
     callbacks_to_add = {}
     
@@ -194,14 +229,13 @@ local function EntityOnUpdate(deltaTime)
     CleanupAll()
     AddWaiting()
     
-    --Log("Updaters: %s, callbacks: %s", #updaters, #callbacks)
+    -- Log("Updaters: %s, callbacks: %s, early callbacks: %s", #updaters, #callbacks, #callbacks_early)
     
     -- early callbacks
-    for index, callback in ipairs(callbacks) do
-        if not callback.deleted and callback.early and callback.last_update + callback.interval <= time then
+    for index, callback in ipairs(callbacks_early) do
+        if not callback.deleted and callback.last_update + callback.interval <= time then
             if not UpdateCallback(callback, time) then
                 callback.deleted = true
-                table.insertunique(delete_callbacks, index)
             end
         end
     end
@@ -211,6 +245,8 @@ local function EntityOnUpdate(deltaTime)
         if not updater.deleted and (not updater.last_update or updater.last_update + updater.interval <= time) then
             
             if not UpdateUpdater(updater, time) then
+                -- not sure this should actually happen
+                -- this usually happens when an entity moves out of relevancy without calling OnDestroy
                 DeleteUpdater(updater.id)
             end
             
@@ -220,10 +256,9 @@ local function EntityOnUpdate(deltaTime)
     
     -- late callbacks
     for index, callback in ipairs(callbacks) do
-        if not callback.deleted and not callback.early and callback.last_update + callback.interval <= time then
+        if not callback.deleted and callback.last_update + callback.interval <= time then
             if not UpdateCallback(callback, time) then
                 callback.deleted = true
-                table.insertunique(delete_callbacks, index)
             end
         end
     end
