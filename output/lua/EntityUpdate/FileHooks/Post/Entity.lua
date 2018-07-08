@@ -103,6 +103,13 @@ function Entity:AddTimedCallbackActual(callback, interval, early)
     table.insert(callbacks_to_add, {id=self:GetId(), callback=callback, interval=interval, early=early, last_update=Shared.GetTime()})
 end
 
+    
+local oldOnInitialized = Entity.OnCreate
+function Entity:OnCreate()
+    -- now handled by this code
+    self:DisableOnUpdateRender()
+end
+
 local oldOnInitialized = Entity.OnInitialized
 function Entity:OnInitialized()
     oldOnInitialized(self)
@@ -270,6 +277,19 @@ local function EntityOnUpdate(deltaTime)
     end
     
 end
+local last_render = Shared.GetTime()
+local function EntityOnUpdateRender()
+    local deltaTime = Shared.GetTime() - last_render
+    last_render = Shared.GetTime()
+    
+    local ents = Shared.GetEntitiesWithClassname("Entity")
+    for index, ent in ientitylist(ents) do
+        if ent and ent.OnUpdateRender then
+            ent:OnUpdateRender(deltaTime)
+        end
+    end
+end
 
 Event.Hook("UpdateServer", EntityOnUpdate)
 Event.Hook("UpdateClient", EntityOnUpdate, "Client")
+Event.Hook("UpdateRender", EntityOnUpdateRender)
