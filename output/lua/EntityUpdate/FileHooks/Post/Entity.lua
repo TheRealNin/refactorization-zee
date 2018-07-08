@@ -1,5 +1,9 @@
 
+-- set to false when disabling the fixed updates hacks on all other entities
+-- (convenience var - will be deleted later)
+-- use like kUseFixedUpdates=Server to only enable on the server
 kUseFixedUpdates = true
+
 
 -- {id, interval, last_update}
 local updaters = {}
@@ -11,7 +15,7 @@ local callbacks = {}
 local callbacks_to_add = {}
 local delete_callbacks = {}
 
-local kTickTime = 1.00
+local kTickTime = 1.00/10
 
 -- this is to make the game feel "smooth" on the client. Could be increased a little.
 if Client then
@@ -20,6 +24,11 @@ end
 
 function Entity:GetTickTime()
     return kTickTime
+end
+
+-- set to true to bypass this update system
+function Entity:UsesRealUpdates()
+    return false
 end
     
 
@@ -30,12 +39,20 @@ Entity.AddTimedCallbackActualActual = Entity.AddTimedCallbackActual
 
 -- actually only marks it to be deleted on the next sweep
 local function DeleteUpdater(id)
+
     for index, updater in ipairs(updaters) do
         if updater.id == id and not updater.deleted then
             updater.deleted = true
             table.insertunique(delete_updaters, index)
         end
     end
+    
+    for i=#updaters_to_add,1,-1 do
+        if updaters_to_add[i].id == id then
+            table.remove(updaters_to_add, i)
+        end
+    end
+    
 end
 
 local function DeleteCallbacks(id)
@@ -45,10 +62,16 @@ local function DeleteCallbacks(id)
             table.insertunique(delete_callbacks, index)
         end
     end
+    
+    for i=#callbacks_to_add,1,-1 do
+        if callbacks_to_add[i].id == id then
+            table.remove(callbacks_to_add, i)
+        end
+    end
 end
 
 local function AddUpdater(id, interval)
-    DeleteUpdater(id) -- there can be only one
+    DeleteUpdater(id)
     table.insert(updaters_to_add, {id=id, interval=interval, last_update=nil})
 end
 
@@ -59,6 +82,9 @@ end
 local oldOnInitialized = Entity.OnInitialized
 function Entity:OnInitialized()
     oldOnInitialized(self)
+    
+    -- literally nothing uses OnPreUpdate so it's safe to disable it
+    self:DisableOnPreUpdate()
     
     -- these are needed by animations and stuff, so don't disable them if we actually need them! 
     -- (no API to re-enable physics callbacks...)
@@ -81,11 +107,16 @@ function Entity:SetFastUpdates(updates)
     self:SetUpdates(updates, 0.0)
 end
 
+local function trueFunc() return true end
+
 function Entity:SetUpdates(updates, interval)
-    --self:SetUpdatesActual(false)
+
+    if self:UsesRealUpdates() then
+        self:SetUpdatesActual(updates)
+        return
+    end
+    self:SetUpdatesActual(false)
     
-    -- literally nothing uses OnPreUpdate so it's safe to disable it
-    self:DisableOnPreUpdate()
     if updates then
         if not interval then
             interval = self:GetTickTime() or kTickTime
@@ -121,8 +152,8 @@ local function UpdateCallback(callback, time)
     return false
 end
 
+-- cleanup all callbacks and updates
 local function CleanupAll()
-    -- cleanup all callbacks and updates
     table.sort(delete_updaters)
     for i=#delete_updaters,1,-1 do
         table.remove(updaters, delete_updaters[i])
@@ -134,6 +165,7 @@ local function CleanupAll()
         table.remove(callbacks, delete_callbacks[i])
     end
     delete_callbacks ={}
+    
 end
 
  -- add all callbacks and updaters waiting
@@ -152,7 +184,11 @@ local function AddWaiting()
 end
 
 local function EntityOnUpdate(deltaTime)
-
+    
+    if Shared.GetIsRunningPrediction() then
+        return
+    end
+    
     local time = Shared.GetTime()
     
     CleanupAll()
@@ -173,10 +209,11 @@ local function EntityOnUpdate(deltaTime)
     -- OnUpdates
     for index, updater in ipairs(updaters) do
         if not updater.deleted and (not updater.last_update or updater.last_update + updater.interval <= time) then
+            
             if not UpdateUpdater(updater, time) then
-                updater.deleted = true
-                table.insertunique(delete_updaters, index)
+                DeleteUpdater(updater.id)
             end
+            
         end
     end
     

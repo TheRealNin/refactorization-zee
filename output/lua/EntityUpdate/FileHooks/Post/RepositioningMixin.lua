@@ -5,6 +5,5 @@ if kUseFixedUpdates then
         
         -- TODO: Fix this hack
         self.GetTickTime = function() return 0 end
-        self:SetUpdates(true)
     end
 end
