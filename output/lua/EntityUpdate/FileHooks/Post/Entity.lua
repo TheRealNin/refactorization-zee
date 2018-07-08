@@ -119,6 +119,7 @@ function Entity:OnInitialized()
         self:DisableOnFinishPhysics()
     end
 end
+
 local oldOnDestroy = Entity.OnDestroy
 function Entity:OnDestroy()
     
@@ -130,8 +131,6 @@ end
 function Entity:SetFastUpdates(updates)
     self:SetUpdates(updates, 0.0)
 end
-
-local function trueFunc() return true end
 
 function Entity:SetUpdates(updates, interval)
 
