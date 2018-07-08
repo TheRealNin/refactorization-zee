@@ -37,10 +37,11 @@ Entity.AddTimedCallbackActualActual = Entity.AddTimedCallbackActual
 
 -- This function returns nil if the entry is planning to add or delete
 local function GetUpdater(id)
-
+    
+    -- if an updater is waiting to be added, return that one
     for index, updater in ipairs(updaters_to_add) do
         if updater.id == id then
-            return nil
+            return updater
         end
     end
     
@@ -56,7 +57,7 @@ end
 local function DeleteUpdater(id)
 
     for index, updater in ipairs(updaters) do
-        if updater.id == id and not updater.deleted then
+        if updater.id == id then
             updater.deleted = true
         end
     end
@@ -66,17 +67,16 @@ local function DeleteUpdater(id)
             table.remove(updaters_to_add, i)
         end
     end
-    
 end
 
 local function DeleteCallbacks(id)
     for index, callback in ipairs(callbacks) do
-        if callback.id == id and not callback.deleted then
+        if callback.id == id then
             callback.deleted = true
         end
     end
     for index, callback in ipairs(callbacks_early) do
-        if callback.id == id and not callback.deleted then
+        if callback.id == id then
             callback.deleted = true
         end
     end
@@ -95,7 +95,7 @@ local function AddUpdater(id, interval)
         existing.interval = interval
     else
         DeleteUpdater(id)
-        table.insert(updaters_to_add, {id=id, interval=interval, last_update=nil})
+        table.insert(updaters_to_add, {id=id, interval=interval, last_update=Shared.GetTime()})
     end
 end
 
@@ -144,8 +144,10 @@ function Entity:SetUpdates(updates, interval)
         if not interval then
             interval = self:GetTickTime() or kTickTime
         end
+        
         AddUpdater(self:GetId(), interval)
     else
+    
         DeleteUpdater(self:GetId())
     end
 end
@@ -155,6 +157,11 @@ local function UpdateUpdater(updater, time)
     if ent then
         local myDelta = time - (updater.last_update or time)
         updater.last_update = time
+        
+        -- skip actually updating entities with parents....
+        if ent:GetParent() then
+            return true
+        end
         ent:OnUpdate(myDelta)
         return true
     end
@@ -218,7 +225,7 @@ local function AddWaiting()
 end
 
 local function EntityOnUpdate(deltaTime)
-    
+
     if Shared.GetIsRunningPrediction() then
         return
     end
