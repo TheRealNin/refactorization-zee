@@ -1,4 +1,4 @@
 
-function Player:GetTickTime()
-    return 0 -- realtime
+function Player:UsesRealUpdates()
+    return true
 end

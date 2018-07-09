@@ -6,6 +6,9 @@ kUseFixedUpdates = true
 
 Log("Refactorization Zee loaded. Be prepared for a bumpy ride.")
 
+
+local last_update = 0
+
 -- {id, interval, last_update}
 local updaters = {}
 local updaters_to_add = {}
@@ -67,9 +70,11 @@ local function DeleteUpdater(id)
             table.remove(updaters_to_add, i)
         end
     end
+    
 end
 
 local function DeleteCallbacks(id)
+
     for index, callback in ipairs(callbacks) do
         if callback.id == id then
             callback.deleted = true
@@ -153,8 +158,8 @@ function Entity:SetUpdates(updates, interval)
         end
         
         AddUpdater(self:GetId(), interval)
+        
     else
-    
         DeleteUpdater(self:GetId())
     end
 end
@@ -163,13 +168,14 @@ local function UpdateUpdater(updater, time)
     local ent = Shared.GetEntity(updater.id)
     if ent then
         local myDelta = time - (updater.last_update or time)
+        
+        -- only actually update entities without parents....
+        if ent:GetParentId() == Entity.invalidId then
+            ent:OnUpdate(myDelta)
+        end
+        
         updater.last_update = time
         
-        -- skip actually updating entities with parents....
-        if ent:GetParent() then
-            return true
-        end
-        ent:OnUpdate(myDelta)
         return true
     end
     return false
@@ -218,7 +224,7 @@ local function AddWaiting()
     for i, new_updater in ipairs(updaters_to_add) do
         table.insert(updaters, new_updater)
     end
-    updaters_to_add = {}
+    table.clear(updaters_to_add)
     
     for i, new_callback in ipairs(callbacks_to_add) do
         if new_callback.early then
@@ -227,13 +233,22 @@ local function AddWaiting()
             table.insert(callbacks, new_callback)
         end
     end
-    callbacks_to_add = {}
+    table.clear(callbacks_to_add)
     
 end
+--[[
+Shared.GetPreviousTimeActual = Shared.GetPreviousTime
+Shared.GetPreviousTime = function()
+    if _updating_updater and _updating_updater.last_update then
+        return _updating_updater.last_update
+    end
+    return Shared.GetPreviousTimeActual()
+end
+]]--
 
 local function EntityOnUpdate(deltaTime)
-
-    if Shared.GetIsRunningPrediction() then
+    
+    if Shared.GetIsRunningPrediction() or Predict then
         return
     end
     
@@ -277,6 +292,9 @@ local function EntityOnUpdate(deltaTime)
     end
     
 end
+
+-- OnUpdateRender overload. Only client.
+-- Might be better for people with bad CPUs?
 local last_render = Shared.GetTime()
 local function EntityOnUpdateRender()
     local deltaTime = Shared.GetTime() - last_render
