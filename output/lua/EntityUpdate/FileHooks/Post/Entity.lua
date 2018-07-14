@@ -6,9 +6,6 @@ kUseFixedUpdates = true
 
 Log("Refactorization Zee loaded. Be prepared for a bumpy ride.")
 
-
-local last_update = 0
-
 -- {id, interval, last_update}
 local updaters = {}
 local updaters_to_add = {}
@@ -24,6 +21,8 @@ local kTickTime = 1/5.0
 if Client then
     kTickTime = 1/15.0
 end
+
+local kMaxTickSlip = kTickTime/4.0
 
 function Entity:GetTickTime()
     return kTickTime
@@ -100,7 +99,7 @@ local function AddUpdater(id, interval)
         existing.interval = interval
     else
         DeleteUpdater(id)
-        table.insert(updaters_to_add, {id=id, interval=interval, last_update=Shared.GetTime()})
+        table.insert(updaters_to_add, {id=id, interval=interval, last_update=nil})
     end
 end
 
@@ -167,14 +166,21 @@ end
 local function UpdateUpdater(updater, time)
     local ent = Shared.GetEntity(updater.id)
     if ent then
-        local myDelta = time - (updater.last_update or time)
+        local myDelta = time - (updater.last_update or Shared.GetPreviousTime())
+        local frameInterval = math.max(updater.interval, time - Shared.GetPreviousTime())
+        local slip = math.max(0, math.min(kMaxTickSlip, myDelta-frameInterval))
         
+        --[[
+        if slip > kMaxTickSlip*0.5 then
+            Log("%s: %s (interval: %s)", ent:GetClassName(), slip, frameInterval)
+        end
+        ]]--
         -- only actually update entities without parents....
         if ent:GetParentId() == Entity.invalidId then
             ent:OnUpdate(myDelta)
         end
         
-        updater.last_update = time
+        updater.last_update = time - slip
         
         return true
     end
@@ -184,7 +190,7 @@ end
 local function UpdateCallback(callback, time)
     local ent = Shared.GetEntity(callback.id)
     if ent then
-        local myDelta = time - (callback.last_update or time)
+        local myDelta = time - (callback.last_update or Shared.GetPreviousTime())
         callback.last_update = time
         local return_val = callback.callback(ent, myDelta)
         if type(return_val) == "number" then
@@ -307,7 +313,7 @@ local function EntityOnUpdateRender()
         end
     end
 end
+Event.Hook("UpdateRender", EntityOnUpdateRender)
 
 Event.Hook("UpdateServer", EntityOnUpdate)
 Event.Hook("UpdateClient", EntityOnUpdate, "Client")
-Event.Hook("UpdateRender", EntityOnUpdateRender)
