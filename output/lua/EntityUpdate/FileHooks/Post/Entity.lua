@@ -108,9 +108,9 @@ function Entity:AddTimedCallbackActual(callback, interval, early)
 end
 
     
-local oldOnInitialized = Entity.OnCreate
+local oldOnCreate = Entity.OnCreate
 function Entity:OnCreate()
-    -- now handled by this code
+    oldOnCreate(self)
     self:DisableOnUpdateRender()
 end
 
@@ -127,6 +127,7 @@ function Entity:OnInitialized()
     
     else
         self:DisableOnUpdatePhysics()
+        self:DisableOnPreparePhysics()
         self:DisableOnFinishPhysics()
     end
 end
@@ -299,6 +300,9 @@ local function EntityOnUpdate(deltaTime)
     
 end
 
+Event.Hook("UpdateServer", EntityOnUpdate)
+Event.Hook("UpdateClient", EntityOnUpdate, "Client")
+
 -- OnUpdateRender overload. Only client.
 -- Might be better for people with bad CPUs?
 local last_render = Shared.GetTime()
@@ -315,5 +319,3 @@ local function EntityOnUpdateRender()
 end
 Event.Hook("UpdateRender", EntityOnUpdateRender)
 
-Event.Hook("UpdateServer", EntityOnUpdate)
-Event.Hook("UpdateClient", EntityOnUpdate, "Client")
