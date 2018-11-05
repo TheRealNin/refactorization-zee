@@ -22,8 +22,6 @@ if Client then
     kTickTime = 1/15.0
 end
 
-local kMaxTickSlip = kTickTime/4.0
-
 function Entity:GetTickTime()
     return kTickTime
 end
@@ -108,12 +106,6 @@ function Entity:AddTimedCallbackActual(callback, interval, early)
 end
 
     
-local oldOnCreate = Entity.OnCreate
-function Entity:OnCreate()
-    oldOnCreate(self)
-    self:DisableOnUpdateRender()
-end
-
 local oldOnInitialized = Entity.OnInitialized
 function Entity:OnInitialized()
     oldOnInitialized(self)
@@ -164,24 +156,29 @@ function Entity:SetUpdates(updates, interval)
     end
 end
 
-local function UpdateUpdater(updater, time)
+local function UpdateUpdater(updater, time, tickDelta)
     local ent = Shared.GetEntity(updater.id)
     if ent then
         local myDelta = time - (updater.last_update or Shared.GetPreviousTime())
-        local frameInterval = math.max(updater.interval, time - Shared.GetPreviousTime())
-        local slip = math.max(0, math.min(kMaxTickSlip, myDelta-frameInterval))
-        
-        --[[
-        if slip > kMaxTickSlip*0.5 then
-            Log("%s: %s (interval: %s)", ent:GetClassName(), slip, frameInterval)
-        end
-        ]]--
+		if updater.interval <= tickDelta and tickDelta ~= myDelta then
+			--Log("deltaTime difference of %s", tickDelta - myDelta)
+			myDelta = tickDelta
+		end
+		
         -- only actually update entities without parents....
-        if ent:GetParentId() == Entity.invalidId then
-            ent:OnUpdate(myDelta)
+		local hasParent
+        if ent:GetParentId() == Entity.invalidId or not ent:GetParent() then
+			hasParent = false
+		else
+			hasParent = true
         end
+		
+        if not updater.hasParent or not hasParent then
+			ent:OnUpdate(myDelta)
+		end
         
-        updater.last_update = time - slip
+		updater.hasParent = hasParent
+        updater.last_update = time
         
         return true
     end
@@ -279,7 +276,7 @@ local function EntityOnUpdate(deltaTime)
     for index, updater in ipairs(updaters) do
         if not updater.deleted and (not updater.last_update or updater.last_update + updater.interval <= time) then
             
-            if not UpdateUpdater(updater, time) then
+            if not UpdateUpdater(updater, time, deltaTime) then
                 -- not sure this should actually happen
                 -- this usually happens when an entity moves out of relevancy without calling OnDestroy
                 DeleteUpdater(updater.id)
@@ -305,17 +302,24 @@ Event.Hook("UpdateClient", EntityOnUpdate, "Client")
 
 -- OnUpdateRender overload. Only client.
 -- Might be better for people with bad CPUs?
+--[[
+local oldOnCreate = Entity.OnCreate
+function Entity:OnCreate()
+	oldOnCreate(self)
+	self:DisableOnUpdateRender()
+end
+
 local last_render = Shared.GetTime()
 local function EntityOnUpdateRender()
-    local deltaTime = Shared.GetTime() - last_render
-    last_render = Shared.GetTime()
-    
-    local ents = Shared.GetEntitiesWithClassname("Entity")
-    for index, ent in ientitylist(ents) do
-        if ent and ent.OnUpdateRender then
-            ent:OnUpdateRender(deltaTime)
-        end
-    end
+	local deltaTime = Shared.GetTime() - last_render
+	last_render = Shared.GetTime()
+	
+	local ents = Shared.GetEntitiesWithClassname("Entity")
+	for index, ent in ientitylist(ents) do
+		if ent and ent.OnUpdateRender then
+			ent:OnUpdateRender(deltaTime)
+		end
+	end
 end
 Event.Hook("UpdateRender", EntityOnUpdateRender)
-
+]]--

@@ -13,9 +13,6 @@ local function SetupFilehookFolder(folderPath, modPath, hookType)
 		local filePath = files[i]
 		local vanillaFilePath = string.gsub(filePath, modPath, "")
 		ModLoader.SetupFileHook(vanillaFilePath, filePath, hookType)
-        if Server then
-            Server.AddRestrictedFileHashes(filePath)
-        end
 	end
 
 end
@@ -30,4 +27,8 @@ local function SetupFilehookFolders(modPath)
 	end
 end
 
-SetupFilehookFolders("EntityUpdate/FileHooks")
+local hookedFolder = "EntityUpdate/FileHooks"
+if Server then
+	Server.AddRestrictedFileHashes(hookedFolder .. "/*")
+end
+SetupFilehookFolders(hookedFolder)
