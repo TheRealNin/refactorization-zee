@@ -15,11 +15,11 @@ local callbacks = {}
 local callbacks_early = {}
 local callbacks_to_add = {}
 
-local kTickTime = 1/5.0
+local kTickTime = 1/4.0
 
 -- this is to make the game feel "smooth" on the client. Could be increased a little.
 if Client then
-    kTickTime = 1/15.0
+    kTickTime = 1/10.0
 end
 
 function Entity:GetTickTime()
@@ -102,26 +102,11 @@ local function AddUpdater(id, interval)
 end
 
 function Entity:AddTimedCallbackActual(callback, interval, early)
+	if not callback then
+		-- Log("Info: callback not added due to null ref")
+		return
+	end
     table.insert(callbacks_to_add, {id=self:GetId(), callback=callback, interval=interval, early=early, last_update=Shared.GetTime()})
-end
-
-    
-local oldOnInitialized = Entity.OnInitialized
-function Entity:OnInitialized()
-    oldOnInitialized(self)
-    
-    -- literally nothing uses OnPreUpdate so it's safe to disable it
-    self:DisableOnPreUpdate()
-    
-    -- these are needed by animations and stuff, so don't disable them if we actually need them! 
-    -- (no API to re-enable physics callbacks...)
-    if HasMixin(self, "BaseModel") or HasMixin(self, "Controller") or HasMixin(self, "Live") then
-    
-    else
-        self:DisableOnUpdatePhysics()
-        self:DisableOnPreparePhysics()
-        self:DisableOnFinishPhysics()
-    end
 end
 
 local oldOnDestroy = Entity.OnDestroy
@@ -240,15 +225,6 @@ local function AddWaiting()
     table.clear(callbacks_to_add)
     
 end
---[[
-Shared.GetPreviousTimeActual = Shared.GetPreviousTime
-Shared.GetPreviousTime = function()
-    if _updating_updater and _updating_updater.last_update then
-        return _updating_updater.last_update
-    end
-    return Shared.GetPreviousTimeActual()
-end
-]]--
 
 local function EntityOnUpdate(deltaTime)
     
